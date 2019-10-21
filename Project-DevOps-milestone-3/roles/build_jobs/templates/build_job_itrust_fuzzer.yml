@@ -1,0 +1,27 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    iTrust_fuzzer_job: iTrust_fuzzer
+    user_name: jenkins
+    user_password: password
+
+  tasks:
+  - name: check if iTrust git folder exists
+    stat:
+      path: "/var/lib/jenkins/jobs/{{ iTrust_fuzzer_job }}/workspace/Testing"
+    register: iTrust_git_file
+
+  - name: delete if the iTrust git directory exists
+    file:
+      state: absent
+      path: "/var/lib/jenkins/jobs/{{ iTrust_fuzzer_job }}/workspace/Testing"
+    when: iTrust_git_file.stat.exists
+    become: true
+
+  - name: build iTrust job
+    shell: "{{ item }}"
+    with_items:
+      - 'java -jar jenkins-cli.jar -s http://localhost:9000/ -auth {{ user_name }}:{{ user_password }} build {{ iTrust_fuzzer_job }}'
+    become: true
+

@@ -1,0 +1,38 @@
+---
+jenkins_home: /var/lib/jenkins
+user_name: 'jenkins'
+user_password: 'password'
+jenkins_url: http://localhost:9000
+checkbox_job: checkboxio
+iTrust_job: iTrust
+home_dir: /home/ubuntu
+iTrust_fuzzer_job: iTrust_fuzzer
+mysql_password: password
+itrust_test_dir: "{{ home_dir }}/Testing"
+fuzz_iterations: 100
+
+# for deployment
+git_name: "{{ lookup('env', 'GIT_NAME') }}"
+git_email: "{{ lookup('env', 'GIT_EMAIL') }}"
+JENKINS_USER: "{{ lookup('env','JENKINS_USER') }}"
+JENKINS_PASSWORD: "{{ lookup('env','JENKINS_PASSWORD') }}"
+
+admin_name: admin
+admin_password: admin
+db_name: mongodb
+db_user: mongoUser
+db_password: devops
+home_dir: /home/ubuntu
+
+environment:
+  APP_PORT: 3002
+  MONGO_PORT: 27017
+  MONGO_IP: "{{ ansible_host }}"
+  MONGO_USER: admin
+  MONGO_PASSWORD: password
+  MAIL_USER: devops2019.team12@gmail.com
+  MAIL_PASSWORD: devops#team12
+  MAIL_SMPT: 'smtp.gmail.com'
+
+
+

@@ -1,0 +1,28 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    iTrust_job: iTrustJob1
+    user_name: jenkins
+    user_password: password
+
+  tasks:
+  - name: check if iTrust git folder exists
+    stat:
+      path: "/var/lib/jenkins/jobs/{{iTrust_job}}/workspace/iTrust2-v4/"
+    register: iTrust_git_file
+
+  - name: delete if the iTrust git directory exists
+    file:
+      state: absent
+      path: "/var/lib/jenkins/jobs/{{iTrust_job}}/workspace/iTrust2-v4/"
+    when: iTrust_git_file.stat.exists
+    become: true
+
+  - name: build iTrust job
+    shell: "{{ item }}"
+    become: true
+    with_items:
+      - 'java -jar jenkins-cli.jar -s http://localhost:9000/ -auth {{ user_name }}:{{ user_password }} build {{ iTrust_job }}'
+    become: true
+

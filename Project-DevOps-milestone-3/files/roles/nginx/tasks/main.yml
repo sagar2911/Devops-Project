@@ -1,0 +1,26 @@
+---
+- name: Install Nginx
+  apt:
+    name: nginx
+    state: present
+
+- name: Adjusting firewall to allow Nginx
+  become: yes
+  ufw:
+    name: Nginx HTTP
+    rule: allow
+
+- name: Copying nginx.conf to the server
+  copy:
+    src: "nginx.conf"
+    dest: "/etc/nginx/nginx.conf"
+
+- name: Copying default (config) file to the server
+  copy:
+    src: "default"
+    dest: "/etc/nginx/sites-available/default"
+
+- name: Restarting Nginx
+  systemd:
+    name: nginx
+    state: reloaded    

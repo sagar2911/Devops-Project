@@ -1,0 +1,1 @@
+sudo ansible-playbook /home/ubuntu/build_job_checkbox.yml

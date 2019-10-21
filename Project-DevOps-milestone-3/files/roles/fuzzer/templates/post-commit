@@ -1,0 +1,2 @@
+#!/bin/sh
+sudo ansible-playbook /home/ubuntu/build_job_itrust_fuzzer.yml

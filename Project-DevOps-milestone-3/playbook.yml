@@ -1,0 +1,209 @@
+---
+- hosts: localhost
+  gather_facts: false
+  become: true
+  vars:
+    JENKINS_NODE: jenkins-srv
+  tasks:
+    - name: Install pip packages
+      apt: 
+        pkg: ['python3-pip','python-pip'] 
+        state: present 
+        update_cache: true
+  
+    - name: Install Boto client for AWS
+      pip:
+        name: ['boto','boto3','botocore']
+        state: present   
+ 
+    - block:
+      - name: Provision jenkins server
+        include_role:
+          name: ec2-provision
+        vars:
+          NODE_NAME: "{{ JENKINS_NODE }}"
+          NODE_GROUP: jenkins
+      become: false
+    
+    - name: Change StrictHostKeyChecking to no
+      lineinfile: 
+        path: /etc/ssh/ssh_config
+        regexp: '#   StrictHostKeyChecking ask'
+        line: '   StrictHostKeyChecking no'
+        state: present
+      become: true
+
+#    - name: Provision jenkins server
+#      include_role:
+#        name: ec2-provision
+#      vars:
+#        NODE_NAME: jenkins
+#        NODE_GROUP: jenkins-srv
+    
+    - name: Get current user
+      become: false
+      shell: whoami
+      register: user
+    
+    - name: Get working directory
+      shell: pwd
+      register: cwd
+
+    - name: Get jenkins server IP
+      shell: "grep -oP '(?<={{ JENKINS_NODE }}=).*$' /etc/environment"
+      register: jenkins_ip
+
+    - name: Create ansible-inventory if not present
+      become: false
+      file: 
+        path: "{{ cwd.stdout }}/ansible_inventory"
+        state: touch
+
+    - name: Update inventory
+      become: false
+      lineinfile:
+        path: "{{ cwd.stdout }}/ansible_inventory"
+        regexp: [jenkins-srv]
+        line: "[jenkins-srv]\njenkins ansible_host={{ jenkins_ip.stdout }} ansible_ssh_user=ubuntu ansible_ssh_private_key_file={{ cwd.stdout }}/{{ JENKINS_NODE }}.pem"
+        state: present
+
+- hosts: jenkins
+  gather_facts: no
+  become: yes
+  pre_tasks:
+    - name: get jenkins server ip address
+      shell: curl ipinfo.io/ip
+      register: ip_add
+
+    - name: print jenkins server ip_address
+      debug:
+        msg: "{{ip_add.stdout}}"
+    
+    - name: Save EC2 instance IP as environment variable
+      become: yes
+      lineinfile:
+        path: /etc/environment
+        regexp: "JENKINS_IP="
+        line: "JENKINS_IP={{ip_add.stdout}}"
+
+    - name: Check if DNS mapping for maqrqdown micro-service is already present
+      shell: grep marqdown /etc/hosts | wc -l
+      register: mapping
+
+    - name: Setup /etc/hosts file for kubernetes micro-service
+      become: yes
+      lineinfile:
+        path: /etc/hosts
+        regexp: '(\s+).*(\s+marqdown)$'
+        line: '0.0.0.0 marqdown'
+        insertbefore: '# The following'
+        state: present
+      when: mapping.stdout == "0"
+
+    #- name: set GIT_EMAIL
+    #  become: yes
+    #  lineinfile: 
+    #    path: /etc/environment 
+    #    regexp: "GIT_EMAIL="
+    #    line: "GIT_EMAIL={{ lookup('env','GIT_EMAIL') }}"
+
+    #- name: set GIT_TOKEN
+    #  become: yes
+    #  lineinfile:
+    #    path: /etc/environment
+    #    regexp: "GIT_TOKEN="
+    #    line: "GIT_TOKEN={{ lookup('env','GIT_TOKEN') }}"
+  roles:
+    - envvariables
+
+- name: Roles in Jenkins server to configure
+  hosts: jenkins
+  gather_facts: no
+  become: true
+  become_method: sudo
+  vars_files:
+    - variables.yml
+  roles:
+    - ansible
+    - mysql
+    - java
+    - node 
+    - mongodb
+    - jenkins
+    - nginx
+  #    - init
+  #    - create_jobs
+  #    - githooks
+    #- build_jobs
+    #- fuzzer
+
+  tasks:
+    # - name: Delete checkbox directory if already exist
+    #   shell: rm -rf /checkbox.io
+
+    # - name: git clone checkbox.io
+    #   git:
+    #     repo: "https://github.com/chrisparnin/checkbox.io.git"
+    #     dest: /checkbox.io
+    #     clone: yes
+
+    # - name: Delete iTrust directory if already exist
+    #   shell: rm -rf /iTrust2-v4
+
+    # - name: git clone iTrust2-v4
+    #   git:
+    #     repo: "https://{{ lookup('env', 'GIT_TOKEN') }}@github.ncsu.edu/sbajaj/iTrust2-v4.git"
+    #     #repo: "git@github.ncsu.edu:sbajaj/iTrust2-v4.git"
+    #     dest: /iTrust2-v4
+    #     clone: yes
+
+    # - name: change permissions
+    #   shell: chmod -R 777 /checkbox.io && chmod -R 777 /iTrust2-v4
+
+    - name: copy files folder
+      copy: 
+        src: "./files"
+        dest: "/home/ubuntu/"
+        owner: ubuntu
+        mode: 0777
+        directory_mode: yes
+      
+
+    - name: Change Mongodb.conf bind ip line
+      lineinfile:
+         dest: /etc/mongodb.conf
+         regexp: 'bind_ip = 127.0.0.1'
+         line: "bind_ip = 127.0.0.1,{{ lookup('env','JENKINS_IP') }}"
+
+    - name: Change Mongodb.conf port line
+      lineinfile: 
+         dest: /etc/mongodb.conf
+         regexp: '#port = 27017'
+         line: "port = 27017"
+     
+    - name: Dos to Unix
+      apt: name=dos2unix state=present update_cache=yes
+      become: yes
+
+  #- import_playbook: mongodb.yml
+      #- name: Copy all roles and files
+      #  copy:
+      #    src: "./src"
+      #    dest: "/"
+      #    mode: 0777
+      #    directory_mode: yes
+            
+ 
+- name: Creating production environment for the jenkins server
+  hosts: jenkins
+  gather_facts: no
+  become: true
+  vars_files:
+    - variables.yml 
+  roles:
+    - create_jobs
+    - githooks
+      
+
+
+ 

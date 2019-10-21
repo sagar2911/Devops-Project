@@ -1,0 +1,79 @@
+---
+- name: DELETE iTrustClone dirctory if it exists
+  file: 
+    path: "{{ itrust_test_dir }}"
+    state: absent
+
+- name: DELETE previous iTrust Test Reports
+  file: 
+    path: "{{ home_dir }}/iTrust_Test_Reports"
+    state: absent
+
+- name: CREATE iTrustClone directory
+  file: 
+    path: "{{ itrust_test_dir }}"
+    state: directory
+    mode: 0775
+
+- name: Clone iTrust Repo
+  git:
+    repo: 'git@github.ncsu.edu:sbajaj/iTrust2-v4.git'
+    dest: "{{ itrust_test_dir }}"
+
+- name: Create Fuzzer branch
+  shell: 'git checkout -b fuzzer'
+  args:
+    chdir: "{{ itrust_test_dir }}"
+
+- name: Add Post-commit Hook
+  template:
+    src: "post-commit"
+    dest: "{{ itrust_test_dir }}/.git/hooks/post-commit"
+    mode: 0767
+ 
+- name: Copy Fuzzer.js file
+  template:
+    src: "fuzzer.js"
+    dest: "{{ home_dir }}/fuzzer.js"
+    mode: 0666
+
+- name: Copy package.json file for fuzzer.js
+  template: 
+    src: "package.json"
+    dest: "{{ home_dir }}/package.json"
+
+- name: Copy the test prioritization code
+  template:
+    src: "test_prioritization.py"
+    dest: "{{ home_dir }}/test_prioritization.py"
+    mode: 0775
+
+- name: Store base-line commit hash for 'git reset' 
+  shell: 'git rev-parse HEAD'
+  args:
+    chdir: "{{ itrust_test_dir }}"
+  register: commit_hash
+
+- name: Copy fuzz_test.yml file
+  copy:
+    src: "fuzz_test.yml"
+    dest: "{{ home_dir }}/fuzz_test.yml"
+    mode: 0666
+# - name: Git add and checkout to master
+#   shell: "cd {{itrust_directory}} && npm install && git checkout master && touch fuzzer.js && git add . && git commit -m \"Commiting to master by developer\""
+
+# - name: Push to the remote repository
+#   shell: "cd {{itrust_directory}} && git push -u origin master"
+
+- name: Install dependecies for fuzzer
+  shell: 'npm install'
+  args:
+    chdir: "{{ home_dir }}"
+
+- name: "Run fuzzing iterations" 
+  shell: "ansible-playbook {{ home_dir }}/fuzz_test.yml -e 'SrcHash={{ commit_hash.stdout }} iteration={{ item }}'"
+  with_sequence: count={{ fuzz_iterations }}
+
+- name: Run test prioritization script
+  shell: 'python test_prioritization.py'
+

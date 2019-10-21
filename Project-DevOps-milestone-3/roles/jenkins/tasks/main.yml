@@ -1,0 +1,214 @@
+---
+ # vars_files:
+ #  - credentials.yml
+  - name: Install jre8
+    apt:
+     name:  openjdk-8-jre
+     state: present
+     update_cache: yes
+    become: true
+
+  - name: Install required packages
+    apt: 
+      pkg: ['maven','nginx','git','vim','html-xml-utils','python3-pip','python-pip','python-dev','python-lxml','python3-setuptools','python-setuptools'] 
+      state: present 
+      update_cache: true
+    become: true
+
+  - name: Add jenkins repo key
+    apt_key:
+     url: https://pkg.jenkins.io/debian/jenkins.io.key
+     state: present
+    become: true
+
+  - name: Add jenkins repo list file into sources.list.d
+    apt_repository:
+     repo: deb http://pkg.jenkins.io/debian-stable binary/
+     state: present
+    become: true
+
+  - name: Install jenkins
+    apt:
+     name: jenkins
+     state: present
+     update_cache: yes
+    become: true
+  
+  - name: Change Jenkins port
+    replace:
+      path: /etc/default/jenkins
+      regexp: '^HTTP_PORT=8080'
+      replace: 'HTTP_PORT=9000'
+    become: true
+
+  - name: Restart Jenkins
+    service:
+      name: jenkins
+      state: restarted
+    become: true
+  
+  - name: Waiting for the initialAdminPassword file to get created
+    wait_for:
+      path: /var/lib/jenkins/secrets/initialAdminPassword
+    become: true
+
+  - name: Read initial admin pwd | jenkins
+    shell: cat /var/lib/jenkins/secrets/initialAdminPassword
+    register: adminpwd
+    become: true
+
+  - name: Ensure Jenkins is up and running
+    uri:
+      url: "http://localhost:9000"
+      status_code: 200
+      timeout: 5
+      user: admin
+      password: "{{ adminpwd.stdout }}"
+      force_basic_auth: yes
+    register: jenkins_service_status
+    # Keep trying for 5 mins in 5 sec intervals
+    retries: 10
+    delay: 5
+    until: >
+      'status' in jenkins_service_status and
+       jenkins_service_status['status'] == 200
+
+  - name: Unlock and add admin user
+    jenkins_script:
+     script: |
+      import jenkins.model.*
+      import hudson.security.*
+      def instance = Jenkins.getInstance()
+      def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+      hudsonRealm.createAccount('jenkins', '${user_pwd}')
+      instance.setSecurityRealm(hudsonRealm)
+      def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+      strategy.setAllowAnonymousRead(false)
+      instance.setAuthorizationStrategy(strategy)
+      instance.save()
+     args:
+      user_pwd: "{{ user_password }}"
+     url: "http://localhost:9000"
+     user: admin
+     password: "{{ adminpwd.stdout }}"
+    become: true
+
+  - name: complete setup wizard
+    jenkins_script:
+     script: |
+      import static jenkins.model.Jenkins.instance as jenkins
+      import jenkins.install.InstallState
+      if (!jenkins.installState.isSetupComplete()) {
+        InstallState.INITIAL_SETUP_COMPLETED.initializeState()
+      }
+     url: "http://localhost:9000"
+     user: admin
+     password: "{{ adminpwd.stdout }}"
+    become: true
+    
+#  - name: Removing Groovy Script so it doesn't create furthermore user
+#    file:
+#      path: "{{jenkins_home}}/init.groovy.d/security.groovy"
+#      state: absent
+#    become: true
+
+  - name: Getting Jenkins CLI Jar
+    get_url:
+      url: "{{jenkins_url}}/jnlpJars/jenkins-cli.jar"
+      dest: "/home/ubuntu/"
+      mode: 0755
+    become: true
+
+  - name: Install Jenkin Plugins
+    jenkins_plugin:
+      name: "{{ item }}"
+      state: latest
+      url: "http://localhost:9000"
+      url_username: admin
+      url_password: "{{ adminpwd.stdout }}"
+      validate_certs: False
+    with_items:
+      - github
+      - structs
+      - workflow-api
+      - workflow-step-api
+      - scm-api
+      - maven-plugin
+      - jacoco
+      - junit
+      - test-stability
+      - postbuildscript
+      - build-timeout
+      - postbuild-task
+      - ws-cleanup
+      - conditional-buildstep
+      - build-pipeline-plugin
+    become: true
+    
+  - name: Installing Boto3
+    become: true
+    pip:
+      name: ['boto','boto3','botocore']
+      state: present
+
+  - name: Install jenkins job builder
+    pip:
+      name: jenkins-job-builder
+      state: present
+
+  - name: Check if Jenkins is running
+    service:
+      name: jenkins
+      state: started
+
+#  - name: Copy private git SSH Key
+#    copy:
+#      src: /home/vagrant/.ssh/git-key
+#      dest: /root/.ssh/git-key
+ #     mode: 0400
+ #   become: true
+
+#  - name: Copy aws credentials
+#    copy:
+#      src: /home/vagrant/.aws
+#      dest: /home/ubuntu/
+#      directory_mode: yes
+#    become: false
+
+#  - name: adding it to the ssh-agent
+#    shell: '{{item}}'
+#    become: true
+#    with_items:
+#      - cd /root/.ssh
+#      - eval "$(ssh-agent -s)" && ssh-add -k /root/.ssh/git-key
+
+
+ # - name: ssh config file copy for git ncsu
+ #   copy:
+ #     src: /home/vagrant/.ssh/config
+#      dest: /root/.ssh/config
+#    become: true
+
+  - name: Change StrictHostKeyChecking to no
+    lineinfile: 
+      path: /etc/ssh/ssh_config
+      regexp: '#   StrictHostKeyChecking ask'
+      line: '   StrictHostKeyChecking no'
+    become: true
+  
+  # - name: Add config file for ssh for github ncsu host
+  #   template:
+  #     src: config
+  #     dest: ~/.ssh/config
+
+  - name: Copy jenkins_jobs.ini file to jenkins server
+    template:
+     src: jenkins_jobs.ini
+     dest: /home/ubuntu/jenkins_jobs.ini
+    become: true 
+
+  - name: Create a job folder
+    file:
+      path: "/home/ubuntu/jobs"
+      state: directory
+    become: true

@@ -1,0 +1,29 @@
+---
+- name: Add Redis to apt-repository
+  become: yes
+  apt_repository:
+    repo: ppa:chris-lea/redis-server
+
+- name: Update cache
+  become: yes
+  apt:
+    update_cache: yes
+
+- name: Install redis-server
+  apt:
+    name: redis-server
+    state: present
+
+- name: Configure Redis server
+  template:
+      src: redis.conf.j2
+      dest: /etc/redis/redis.conf
+      force: yes 
+
+- name: Restart Redis server
+  service: 
+      name: redis-server
+      state: restarted
+
+- name: Set flag off
+  command: redis-cli set aflag false

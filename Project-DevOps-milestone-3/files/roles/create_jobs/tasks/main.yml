@@ -1,0 +1,89 @@
+---
+- name: Enable sudo access to jenkins user 
+  lineinfile:
+    path: /etc/sudoers
+    line: "jenkins ALL=(ALL) NOPASSWD: ALL"
+  become: true
+
+#- name: Setup mongoDb for checkboxio
+#  copy:
+#    src: "templates/setup_mongodb.yml"
+#    dest: /var/lib/jenkins/setup_mongodb.yml
+#    owner: jenkins
+#    group: jenkins
+#    mode: 0666
+#  become: yes
+
+- name: Copy Checkbox.io jenkins-job-builder script to jenkins server
+  template:
+    src: "checkbox_dep_jobs.yml"
+    dest: /home/ubuntu/jobs/{{checkbox_job}}.yml
+  become: yes
+
+- name: Copy iTrust jenkins-job-builder script to jenkins server
+  template:
+   src:  "iTrust_dep_jobs.yml"
+   dest: /home/ubuntu/jobs/{{iTrust_job}}.yml
+  become: yes
+
+#- name: Copy iTrust Fuzzer jenkins job  script
+#  template:
+#    src: "itrust_fuzzing.yml"
+#    dest: /home/ubuntu/jobs/itrust_fuzzing.yml
+#  become: yes
+
+- name: read admin pwd | Jenkins
+  shell: cat /var/lib/jenkins/secrets/initialAdminPassword
+  register: adminpwd
+  become: true
+
+#- name: check if itrust git folder exists
+#  stat:
+#    path: "/var/lib/jenkins/workspace/{{ iTrust_job }}/iTrust2-v4/"
+#  register: gitexists
+
+#- name: delete if the itrust directory exists
+#  file:
+#    state: absent
+#    path: "/var/lib/jenkins/workspace/{{ iTrust_job }}/iTrust2-v4"
+#  when: gitexists.stat.exists
+#  become: true
+
+#- jenkins_script:
+#   script: |
+#    import jenkins.model.*
+#    import hudson.security.*
+#    def instance = Jenkins.getInstance()
+#    instance.disableSecurity()
+#    instance.save()
+#   url: http://localhost:9000
+#   user: admin
+#   password: "{{ adminpwd.stdout }}"
+
+- name: Create both jobs by running the job builder scripts
+  shell: 'jenkins-jobs --conf /home/ubuntu/jenkins_jobs.ini update /home/ubuntu/jobs'
+
+#- jenkins_script:
+#   script: |
+#    import jenkins.model.*
+#    import hudson.security.*
+#    def instance = Jenkins.getInstance()
+#    def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+#    instance.setSecurityRealm(hudsonRealm)
+#    def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+#    strategy.setAllowAnonymousRead(false)
+#    instance.setAuthorizationStrategy(strategy)
+#    instance.save()
+#   url: http://localhost:9000
+#   user: admin
+#   password: "{{ adminpwd.stdout }}"
+
+- name: Get jenkins crumb
+  shell: curl -s 'http://{{JENKINS_USER}}:{{JENKINS_PASSWORD}}@localhost:9000/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,":",//crumb)'
+  register: crumb
+
+- name: Get crumb into Environment
+  lineinfile:
+    path: /etc/environment
+    regexp: "CRUMB="
+    line: "CRUMB={{crumb.stdout}}"

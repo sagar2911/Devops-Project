@@ -1,0 +1,60 @@
+---
+  - name: Setting Git username and email
+    shell: cd /iTrust2-v4 && git config --global user.name "{{ lookup('env','GIT_NAME') }}" && git config --global user.email "{{ lookup('env','GIT_EMAIL') }}"
+
+  # production env iTrust
+
+  - name: production environment
+    file: path=/deploy/itrust-prod.git state=directory
+
+  - name: initialze a git repository in the production.git
+    shell: git init --bare
+    args:
+      chdir: /deploy/itrust-prod.git/
+
+  - name: Copy post-receive hook to production git repo
+    template:
+      src: "post-receive-iTrust"
+      dest: "/deploy/itrust-prod.git/hooks/post-receive"
+      mode: 0777
+
+  - name: production environment
+    file: path=/deploy/production-www state=directory
+
+  - name: add origin to production
+    shell: git remote add prod file:///deploy/itrust-prod.git
+    args:
+      chdir: /iTrust2-v4
+    ignore_errors: yes
+
+  #- name: Enable firewall
+  #  shell: sudo ufw enable
+
+  - name: Restart mysql server
+    shell: service mysql restart
+
+  # production env checkbox
+
+  - name: production environment
+    file: path=/deploy/checkbox-prod.git state=directory
+
+  - name: initialze a git repository in the production.git
+    shell: git init --bare
+    args:
+      chdir: /deploy/checkbox-prod.git/
+
+  - name: Copy post-receive hook to production git repo
+    template:
+      src: "post-receive-checkbox"
+      dest: "/deploy/checkbox-prod.git/hooks/post-receive"
+      mode: 0777
+
+  - name: production environment
+    file: path=/deploy/checkbox-prod-www state=directory
+
+  - name: add origin to production
+    shell: git remote add prod file:///deploy/checkbox-prod.git
+    args:
+      chdir: /checkbox.io
+    ignore_errors: yes
+

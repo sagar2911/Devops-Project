@@ -1,0 +1,16 @@
+---
+- name: Update Cache
+  become: yes
+  apt:
+    update_cache: yes
+
+- name: Install docker
+  become: yes
+  apt:
+    name: docker.io
+    state: present
+
+- name: Usermod Docker
+  become: yes
+  shell: usermod -aG docker $(whoami)
+...

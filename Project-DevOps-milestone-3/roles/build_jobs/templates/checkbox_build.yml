@@ -1,0 +1,183 @@
+---
+#- import_playbook: mongodb_init.yml
+
+- hosts: localhost
+  gather_facts: false
+  become: true
+  become_method: sudo
+  vars: 
+    admin_name: admin
+    admin_password: admin
+    db_name: mongodb
+    db_user: mongoUser
+    db_password: devops
+    home_dir: /home/ubuntu
+
+  environment:
+    APP_PORT: 3001
+    MONGO_PORT: 27017
+    MONGO_IP: "{{ ansible_host }}"
+    MONGO_USER: admin
+    MONGO_PASSWORD: password
+    MAIL_USER: devops2019.team12@gmail.com
+    MAIL_PASSWORD: devops#team12
+    MAIL_SMPT: 'smtp.gmail.com'
+
+
+  tasks:
+  - name: Update and upgrade apt packages
+    apt:
+      update_cache: yes
+      upgrade: yes
+      cache_valid_time: 86400
+    become: true
+
+  - name: Check if checkbox folder already exists
+    stat: 
+     path: checkbox
+    register: checkbox_exists
+
+  - name: Delete folder if exists
+    file:
+      state: absent 
+      path: checkbox
+    when: checkbox_exists.stat.exists
+
+  - name: Creat new directory for checkbox    
+    file:
+      path: "{{ home_dir }}/checkbox"
+      state: directory
+      mode: 0775
+      recurse: yes
+
+  - name: Clone Checkbox.io repo
+    git:
+      repo: /home/ubuntu/test/checkbox_latest/
+      #dest: "{{ home_dir }}/"
+      dest: "{{ home_dir }}/checkbox/"
+
+  - name: Install dependencies | npm
+    npm:
+      path: "{{ home_dir }}/checkbox/server-side/site"
+
+  - name: Import MongoDB public GPG Key from ubuntu keyserver
+    become: true
+    apt_key:
+      keyserver: keyserver.ubuntu.com
+      id: 2930ADAE8CAF5059EE73BB4B58712A2291FA4AD5
+      state: present
+ 
+  - name: Add repository for MongoDB
+    shell: sudo apt-add-repository "deb [ arch=$(dpkg --print-architecture) ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -sc)/mongodb-org/3.6 multiverse"
+    become: true
+     
+  - name: Install latest package
+    become: true
+    apt:
+      name: ['mongodb','python-pip','python3-pip','python3-setuptools']
+      state: latest
+      update_cache: yes
+      force: yes
+     
+  - name: Install pymongo
+    become: true
+    pip:
+      name: pymongo
+      state: latest
+
+  - name: Create MongoDB root user 'admin'
+    mongodb_user:
+      database: "admin"
+      name: "{{ admin_name }}"
+      password: "{{ admin_password }}"
+      roles: "root"
+      state: present 
+     
+  - name: Create a new database 'mongodb' and user in MongoDB
+    become: true
+    mongodb_user: 
+      login_user: "{{ admin_name }}"
+      login_password: "{{ admin_password }}"
+      database: '{{db_name}}'
+      name: '{{ admin_name }}'
+      password: '{{ admin_password }}'
+     # name: '{{db_user}}'
+     # password: '{{db_password}}'
+      roles: readWrite,dbAdmin,userAdmin
+      state: present
+
+  - name: Replace the server root in the "default" file
+    replace:
+      dest: "{{ home_dir }}/checkbox/local-conf/default"
+      regexp: "root (.)+;"
+      replace: "root {{ home_dir }}/checkbox/public_html/;"
+
+  - name: 'Copy files from checkbox to nginx available sites'
+    copy:
+      src: "{{ home_dir }}/checkbox/local-conf/default"
+      dest: /etc/nginx/sites-available/default
+      remote_src: yes
+      mode: 0644
+    become: yes
+    become_method: sudo 
+
+  - name: 'Copy nginx conf file'
+    copy:
+      src: "{{ home_dir }}/checkbox/local-conf/nginx.conf"
+      dest: /etc/nginx/nginx.conf
+      remote_src: yes
+      mode: 0644
+    become: yes
+    become_method: sudo
+
+  - name: Restart Nginx
+    become: true
+    service:
+      name: nginx
+      state: restarted
+
+###
+
+  - name: Install process manager using npm
+    become: true
+    npm:
+      global: yes
+      name: pm2
+
+#  - name: Starting/Restarting nginx using forever
+#    shell: forever stopall; forever start server.js
+#    args:
+#      chdir: "/home/ubuntu/checkbox/server-side/site/"
+
+  - name: Running checkbox using pm2
+    shell: pm2 stop all; pm2 start server.js
+    args:
+      chdir: "{{ home_dir }}/checkbox/server-side/site/"
+
+  - name: Run analysis 
+    shell: npm install && node analysis.js
+    args:
+      chdir: "{{home_dir}}/analysis"
+
+  - name: wait for PassBuild.txt
+    wait_for:
+      path: "{{home_dir}}/analysis/PassBuild.txt"
+  
+
+  - name: Read initial admin pwd | jenkins
+    shell: cat /var/lib/jenkins/secrets/initialAdminPassword
+    register: adminpwd
+    become: true
+
+  - name: check reports and act accordingly
+    jenkins_script:
+     script: |
+      import hudson.AbortException
+      String fileContents = new File('{{home_dir}}/analysis/PassBuild.txt').text
+      if (fileContents.contains("false")) {
+        throw new AbortException("Analysis showed failed conditions, check reports")
+      }
+     url: "http://localhost:9000"
+     user: admin
+     password: "{{ adminpwd.stdout }}"
+    become: true

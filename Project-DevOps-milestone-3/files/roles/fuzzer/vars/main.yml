@@ -1,0 +1,5 @@
+---
+
+itrust_fuzzer_job_name: iTrust_fuzzer
+itrust_directory: ~/iTrustFuzzer
+JENKINS_URL: 3.88.219.60

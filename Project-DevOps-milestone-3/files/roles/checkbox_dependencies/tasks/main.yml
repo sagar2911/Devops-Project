@@ -1,0 +1,74 @@
+---
+- name: Install Python2
+  raw: apt-get -y install python-simplejson
+  become: yes
+
+#- name: Obtain ip address of kubernetes master
+#  ec2_instance_facts:
+#    filters:
+#      "tag:Name": kubemaster
+#      "instance-state-name": running
+#  register: master
+#  delegate_to: localhost
+
+- name: Obtain ip address of kubernetes master
+  become: true 
+  shell: grep -oP '(?<=kubemaster=).*$' /etc/environment
+  register: master
+  delegate_to: localhost
+
+#- name: Check if DNS mapping for maqrqdown micro-service is already present
+#  shell: grep marqdown /etc/hosts | wc -l
+#  register: mapping
+
+- name: Setup /etc/hosts file for kubernetes micro-service
+  become: yes
+  lineinfile:
+    path: /etc/hosts
+    regexp: 'marqdown'
+    #regexp: '(\s+).*(\s+marqdown)$'
+    #line: "{{ master.instances[0].public_ip_address }} marqdown"
+    line: "{{ master.stdout }} marqdown"
+    insertbefore: '# The following'
+    state: present
+#  when: mapping.stdout == "0"
+
+#- name: Replace kubemaster ip in /etc/hosts if already set
+#  become: true
+#  replace:
+#    path: /etc/hosts
+#    regexp: '(\s+).*(\s+kubemaster)$'
+#    replace: "\n{{ master.stdout }}\2"
+#  when: mapping.stdout != "0"
+  
+- lineinfile: dest=/etc/environment line=MONGO_PORT={{ lookup('env', 'MONGO_PORT') }}
+#- lineinfile: dest=/etc/environment line=MONGO_IP={{ lookup('env', 'localhost') }}
+- lineinfile: dest=/etc/environment line=MONGO_IP={{ lookup('env', 'JENKINS_IP') }}
+- lineinfile: dest=/etc/environment line=MONGO_USER={{ lookup('env', 'MONGO_USER') }}
+- lineinfile: dest=/etc/environment line=MONGO_PASSWORD={{ lookup('env', 'MONGO_PASSWORD') }}
+- lineinfile: dest=/etc/environment line=MAIL_USER={{ lookup('env', 'MAIL_USER') }}
+- lineinfile: dest=/etc/environment line=MAIL_PASSWORD={{ lookup('env', 'MAIL_PASSWORD') }}
+- lineinfile: dest=/etc/environment line=MAIL_SMTP={{ lookup('env', 'MAIL_SMTP') }}
+- lineinfile: dest=/etc/environment line=GIT_TOKEN={{ lookup('env', 'GIT_TOKEN') }}
+- lineinfile: dest=/etc/environment line=AWS_REGION={{ lookup('env', 'AWS_REGION') }}
+- lineinfile: dest=/etc/environment line=AWS_ACCESS_KEY={{ lookup('env', 'AWS_ACCESS_KEY') }}
+- lineinfile: dest=/etc/environment line=AWS_SECRET_ACCESS_KEY={{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}
+- lineinfile: dest=/etc/environment line=JENKINS_IP={{ lookup('env', 'JENKINS_IP') }}
+- lineinfile: dest=/etc/environment line=kubemaster={{ lookup('env', 'kubemaster') }}
+
+# - name: Setup environment variables on Checkbox server
+#   hosts: checkbox1
+#   become: yes
+- include_role: name=node
+- include_role: name=nginx
+- include_role: name=mongodb
+
+- name: Setting up variables
+  set_fact:
+    MONGO_PORT: "{{ lookup('env', 'MONGO_PORT') }}"
+    MONGO_IP: "{{ lookup('env', 'localhost') }}"
+    MONGO_USER: "{{ lookup('env', 'MONGO_USER') }}"
+    MONGO_PASSWORD: "{{ lookup('env', 'MONGO_PASSWORD') }}"
+    MAIL_USER: "{{ lookup('env', 'MAIL_USER') }}"
+    MAIL_PASSWORD: "{{ lookup('env', 'MAIL_PASSWORD') }}"
+    MAIL_SMTP: "{{ lookup('env', 'MAIL_SMTP') }}"

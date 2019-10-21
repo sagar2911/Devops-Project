@@ -1,0 +1,5 @@
+var child_process = require('child_process');
+child_process.execSync('cd /var/lib/jenkins/jobs/{{iTrust_fuzzer_job}}/workspace/ && sudo git clone {{ itrust_test_dir }}');
+child_process.execSync('sudo cp /var/lib/jenkins/jobs/{{iTrust_fuzzer_job}}/workspace/Testing/iTrust2/src/main/java/db.properties.template /var/lib/jenkins/jobs/{{iTrust_fuzzer_job}}/workspace/Testing/iTrust2/src/main/java/db.properties');
+child_process.execSync('sudo cp /var/lib/jenkins/jobs/{{iTrust_fuzzer_job}}/workspace/Testing/iTrust2/src/main/java/email.properties.template /var/lib/jenkins/jobs/{{iTrust_fuzzer_job}}/workspace/Testing/iTrust2/src/main/java/email.properties');
+child_process.execSync('cd /var/lib/jenkins/jobs/{{iTrust_fuzzer_job}}/workspace/Testing/iTrust2 && sudo mvn -f pom-data.xml process-test-classes && sudo mvn clean test verify checkstyle:checkstyle');

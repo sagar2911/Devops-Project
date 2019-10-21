@@ -1,0 +1,84 @@
+###
+#- name: check if checkbox git folder exists
+#  stat:
+#    path: "/var/lib/jenkins/workspace/{{checkbox_job}}/checkbox.io/"
+#  register: checkbox_git_file
+
+#- name: delete if the checkbox git directory exists
+#  file:
+#    state: absent
+#    path: "/var/lib/jenkins/workspace/{{checkbox_job}}/checkbox.io/"
+#  when: checkbox_git_file.stat.exists
+#  become: true
+
+#- name: build checkboxio job
+#  shell: '{{item}}'
+#  become: true
+#  with_items:
+#    - 'java -jar jenkins-cli.jar -s http://localhost:8080/ -auth {{admin_username}}:{{ admin_user_pass }} build {{ checkbox_job }}'
+#    become: true
+
+###
+
+- name: Copy Checkbox build script to jenkins server
+  copy:
+    src: "templates/build_job_checkbox.yml"
+    dest: /home/ubuntu/
+  become: true
+
+- name: Copy iTrust build script to jenkins server
+  copy:
+    src: "templates/build_job_itrust.yml"
+    dest: /home/ubuntu/
+  become: true
+
+- name: DELETE checkbox dirctory if it exists
+  file: 
+    path: "/home/ubuntu/analysis"
+    state: absent
+
+- name: DELETE previous checkbox Analysis Reports
+  file: 
+    path: "/home/ubuntu/analysis/report"
+    state: absent
+
+- name: CREATE Checkbox analysis directory
+  file: 
+    path: "/home/ubuntu/analysis"
+    state: directory
+    mode: 0775
+
+- name: CREATE Checkbox Reports directory
+  file: 
+    path: "/home/ubuntu/analysis/report"
+    state: directory
+    mode: 0775
+
+- name: Copy Analysis.js file
+  template:
+    src: "templates/analysis.js"
+    dest: "/home/ubuntu/analysis"
+    mode: 0666
+
+- name: Copy package.json file for analysis.js
+  template: 
+    src: "templates/package.json"
+    dest: "/home/ubuntu/analysis"
+
+- name: Copy config file for analysis.js
+  template: 
+    src: "templates/config.js"
+    dest: "/home/ubuntu/analysis"
+
+
+- name: Copy checkbox build playbook to jenkins server
+  copy:
+    src: "templates/checkbox_build.yml"
+    dest: /home/ubuntu/
+  become: true
+
+- name: Copy iTrust Fuzzer build script to jenkins server
+  copy:
+    src: "templates/build_job_itrust_fuzzer.yml"
+    dest: /home/ubuntu/
+  become: true

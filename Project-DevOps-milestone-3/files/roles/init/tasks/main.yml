@@ -1,0 +1,46 @@
+
+
+- name: DELETE test checkbox dirctory if it exists
+  file: 
+    path: "/home/ubuntu/test/checkbox"
+    state: absent
+
+- name: DELETE test checkbox bare git dirctory if it exists
+  file: 
+    path: "/home/ubuntu/test/checkbox_latest"
+    state: absent
+
+- name: CREATE Checkbox analysis directory
+  file: 
+    path: "/home/ubuntu/test/checkbox"
+    state: directory
+    mode: 0775
+
+- name: CREATE Checkbox analysis directory
+  file: 
+    path: "/home/ubuntu/test/checkbox_latest"
+    state: directory
+    mode: 0775
+
+- name: Add bare repo
+  git:
+    repo: https://github.com/sagar2911/checkbox.io.git
+    dest: /home/ubuntu/test/checkbox_latest
+    bare: yes
+
+- name: Clone checkbox on jenkins server
+  git:
+    repo: https://github.com/sagar2911/checkbox.io.git
+    dest: /home/ubuntu/test/checkbox
+
+- name: add remote prod
+  shell: cd /home/ubuntu/test/checkbox/ && git remote add prod /home/ubuntu/test/checkbox_latest
+
+- name: Copy the post-receive hook to jenkins server
+  copy:
+    src: "templates/post-receive"
+    dest: /home/ubuntu/test/checkbox_latest/hooks/
+  become: true
+
+- name: add remote prod
+  shell: cd /home/ubuntu/test/checkbox_latest/hooks && chmod +x post-receive

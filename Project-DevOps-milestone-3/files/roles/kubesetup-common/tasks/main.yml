@@ -1,0 +1,40 @@
+---
+- name: Update Cache
+  become: yes
+  apt:
+    update_cache: yes
+
+- name: Install apt-transport-https
+  become: yes
+  apt:
+    name: apt-transport-https
+    state: present
+
+- name: Add Kubernetes key
+  become: yes
+  apt_key:
+    url: "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+    state: present
+
+- name: Add apt-repository
+  become: yes
+  apt_repository:
+    repo: "deb http://apt.kubernetes.io/ kubernetes-xenial main"
+    filename: "kubernetes.list"
+    state: present
+
+- name: Update Cache
+  become: yes
+  apt:
+    update_cache: yes
+
+- name: Install Kubernetes packages
+  become: yes
+  with_items:
+    - kubelet
+    - kubeadm
+    - kubernetes-cni
+  apt:
+    name: "{{ item }}"
+    state: present
+...

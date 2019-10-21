@@ -1,0 +1,71 @@
+- hosts: iTrust-prod
+  gather_facts: no
+  # become: yes
+  # become_method: sudo
+  vars_files:
+    - variables.yml
+  tasks:
+    - name: Check if itrust folder exists
+      stat: 
+        path: "{{ home_dir }}/iTrust2-v4"
+      register: itrust_exists
+
+    - name: Delete folder if exists
+      file:
+        path: "{{ home_dir }}/iTrust2-v4"
+        state: absent 
+      when: itrust_exists.stat.exists
+
+    - name: Clone repo
+      copy: 
+        src: "{{ home_dir }}/iTrust2-v4"
+        dest: "{{ home_dir }}"
+        owner: ubuntu
+        group: ubuntu
+      become_user: ubuntu
+     
+    - name: Edit mysql.conf file
+      lineinfile:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        line: skip-grant-tables
+        insertafter: skip-external-locking
+      become: yes
+  
+    - name: Restarting mysql service
+      service:
+        name: mysql
+        state: restarted
+      become: yes
+      
+    - name: Setup database
+      command: mvn -f pom-data.xml process-test-classes
+      args:
+        chdir: "{{ home_dir }}/iTrust2-v4/iTrust2"
+      become: yes
+
+    - name: Check if war exists
+      stat: 
+        path: /opt/jetty9/webapps/iTrust2.war
+      register: war_exists
+  
+    - name: Delete war if exists
+      become: yes
+      file:
+        path: /opt/jetty9/webapps/iTrust2.war
+        state: absent 
+      when: war_exists.stat.exists
+
+
+    - name: Copy war
+      become: yes
+      copy:
+        src: "{{ home_dir }}/iTrust2-v4/iTrust2/target/iTrust2.war" 
+        dest: /opt/jetty9/webapps/iTrust2.war
+
+    - name: Start jetty
+      shell: 'nohup java -jar start.jar &'
+      args:
+        chdir: /opt/jetty9
+    
+
+      

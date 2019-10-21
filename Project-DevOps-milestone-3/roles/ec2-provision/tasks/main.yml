@@ -1,0 +1,143 @@
+---
+- set_fact: 
+    SEC_GROUP: devops_final_milestone
+    aws_region: "{{ lookup('env', 'AWS_REGION') }}"
+
+# - name: Get AWS region from config
+#   become: false
+#   shell: grep -oP '(?<=region=).*$' /home/ubuntu/.aws/config
+#   register: aws_region
+
+- name: create key pair using provided key_material
+  ec2_key:
+    name: "{{ NODE_NAME }}"
+    region: "{{ aws_region | default('us-east-1',true) }}"
+  register: new_key
+  become: false
+
+- local_action: copy content={{ new_key.key.private_key }} dest="{{ NODE_NAME }}.pem" owner=ubuntu group=ubuntu mode=0600
+  when: new_key.key.private_key is defined
+  become: true
+ 
+- name: Create Security group in EC2
+  ec2_group:
+    description: Devops final milestone
+    name: "{{ SEC_GROUP }}"
+    region: "{{ aws_region | default('us-east-1',true) }}"
+    rules:
+      - proto: tcp
+        ports:
+          - 80
+          - 8080
+          - 9000
+          - 22
+          - 6443
+          - 3306
+          - 27017
+          - 32000
+          - 3000
+          - 3002
+
+        cidr_ip: 0.0.0.0/0
+      - proto: icmp
+        from_port: -1
+        to_port:  -1
+        cidr_ip: 0.0.0.0/0
+
+- name: Check if instance is already running
+  ec2_instance_facts:
+    filters:
+      "tag:Name": "{{ NODE_NAME }}"
+      "instance-state-name": running
+  register: running
+
+- name: Check if instance is in stopped state
+  ec2_instance_facts:
+    filters:
+      "tag:Name": "{{ NODE_NAME }}"
+      "instance-state-name": stopped
+  register: stopped
+
+- name: Start instance if already spawned and not running
+  ec2:
+    instance_ids: "{{ stopped.instances[0].instance_id }}"
+    region: "{{ aws_region | default('us-east-1',true) }}"
+    state: running
+    wait: yes
+  when: running.instances | length == 0 and stopped.instances | length != 0
+
+- name: Obtain instance ami_id
+  ec2_ami_facts:
+    filters:
+      name: "ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20181223"
+  register: ami_find
+  when: running.instances | length == 0 and stopped.instances | length == 0
+
+- name: Create EC2 instance
+  ec2:
+    key_name: "{{ NODE_NAME }}"
+    group: "{{ SEC_GROUP }}"
+    instance_type: t2.medium
+    instance_tags:
+      Name: "{{ NODE_NAME }}"
+    image: "{{ ami_find.images[0].image_id }}"
+    region: "{{ aws_region | default('us-east-1',true) }}"
+    state: present
+    wait: yes
+  when: running.instances | length == 0 and stopped.instances | length == 0
+
+- name: Waiting for the EC2 instance to boot
+  #wait_for:
+  #  host: "{{ new_instance.instances[0].public_ip }}"
+  #  port: 22
+  #  state: started
+  pause:
+    seconds: 30
+  when: running.instances | length == 0 or stopped.instances | length != 0
+
+- name: Obtain ip address of instance
+  ec2_instance_facts:
+    filters:
+      "tag:Name": "{{ NODE_NAME }}"
+      "instance-state-name": running
+  register: new_instance
+
+- set_fact: ip="{{ new_instance.instances[0].public_ip_address }}"
+
+- name: Get CWD
+  shell: pwd
+  register: cwd
+
+- name: Add ec2 instance to in-memory inventory
+  become_user: ubuntu
+  add_host:
+    hostname: "{{ NODE_NAME }}"
+    ansible_host: "{{ new_instance.instances[0].public_ip_address }}"
+    group: "{{ NODE_GROUP }}"
+    ansible_ssh_user: ubuntu
+    ansible_ssh_private_key_file: "{{ cwd.stdout }}/{{ NODE_NAME }}.pem"
+    ansible_python_interpreter: /usr/bin/python3
+
+- name: Add EC2 instance IP to environment
+  become: yes
+  lineinfile:
+    path: /etc/environment
+    regexp: "{{ NODE_NAME }}="
+    line: "{{ NODE_NAME }}={{ ip }}"
+
+- name: Export EC2 instance IP
+  lineinfile:
+    path: ~/.bashrc
+    regexp: "{{ NODE_NAME }}="
+    line: "export {{ NODE_NAME }}={{ ip }}"
+
+#- name: Source the bashrc file
+#  action: "shell . ~/.bashrc && export jenkins={{ ip }}"
+#  become: false
+
+# - name: Export the IP of the instance as an environment variable
+#   shell: "export {{ NODE_NAME }}={{ ip }}"
+#   args: 
+#     executable: /bin/bash
+#   become: false
+

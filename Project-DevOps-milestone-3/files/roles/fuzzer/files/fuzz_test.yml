@@ -1,0 +1,26 @@
+---
+- hosts: localhost
+  gather_facts: no
+  become: true
+  become_method: sudo
+
+  tasks:
+  - name: Reset to base-line commit
+    shell: "cd /home/ubuntu/Testing && git reset --hard {{ SrcHash }}"
+
+  - name: Execute Fuzzer
+    shell: 'node fuzzer.js {{ iteration }} {{ SrcHash }}'
+
+  - name: Commit randomly altered code changes
+    shell: "cd /home/ubuntu/Testing && git add . && git commit -m 'Fuzzer commit #{{ iteration }}'"
+
+  - name: Wait for current build to finish
+    wait_for:
+      path: "/var/lib/jenkins/jobs/iTrust_fuzzer/workspace/Testing/iTrust2/target/surefire-reports/TEST-edu.ncsu.csc.itrust2.unit.LockoutTest.xml"
+      state: present
+  - wait_for:
+      timeout: 10
+  - name: Gather test reports of current build for processing
+    copy:
+      src: "/var/lib/jenkins/jobs/iTrust_fuzzer/workspace/Testing/iTrust2/target/surefire-reports/"
+      dest: "/home/ubuntu/iTrust_Test_Reports/Build_{{ iteration }}"

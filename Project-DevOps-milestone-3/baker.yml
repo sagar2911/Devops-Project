@@ -1,0 +1,5 @@
+name: ansible_c
+vm:
+  ip: 192.168.88.88
+tools:
+  - ansible

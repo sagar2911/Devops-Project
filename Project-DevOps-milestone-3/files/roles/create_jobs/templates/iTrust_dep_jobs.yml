@@ -1,0 +1,19 @@
+- job:
+    name: "{{iTrust_job}}"
+    description: "automatically build iTrust"
+    project-type: freestyle
+    builders:
+      - shell: 'sudo ansible-playbook /home/ubuntu/files/itrust_build.yml'
+    publishers:
+      - postbuildscript:
+          builders:
+          - build-steps:
+            - shell: 'sudo ansible-playbook /home/ubuntu/files/itrust_deploy.yml'
+
+      - jacoco:
+            exec-pattern: '**/target/coverage-reports/**.exec'
+            update-build-status: true
+            targets:
+              - instruction:
+                  healthy: 50
+                  unhealthy: 10

@@ -1,0 +1,42 @@
+---
+- name: Specify MySQL root password before installing
+  debconf: name='mysql-server' question='mysql-server/root_password' value='{{mysql_password | quote}}' vtype='password'
+  become: yes
+
+- name: Confirm MySQL root password before installing
+  debconf: name='mysql-server' question='mysql-server/root_password_again' value='{{mysql_password | quote}}' vtype='password'
+  become: yes
+
+- name: Copy mysql my.conf file
+  template: src=.my.cnf dest={{ home_dir }}/.my.cnf owner={{ansible_user}} mode=0600
+
+- name: Install MySQL 5.7 packages
+  apt: pkg={{ item }} state=present update_cache=yes
+  become: yes
+  with_items:
+    - mysql-client
+    - mysql-common
+    - mysql-server
+    - python3-pymysql
+
+- name: insert skip grant tables in my.cnf
+  lineinfile: 
+    dest: /etc/mysql/mysql.conf.d/mysqld.cnf
+    insertafter: 'skip-external-locking'
+    line: 'skip-grant-tables'
+  become: true
+
+- name: restarting mysql
+  service:
+    name: mysql
+    enabled: yes
+    state: restarted
+  become: yes
+
+
+- name: Start mysql service	
+  become: yes
+  service:
+    name: mysql
+    state: started
+    enabled: true

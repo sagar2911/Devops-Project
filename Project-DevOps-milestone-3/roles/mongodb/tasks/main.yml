@@ -1,0 +1,96 @@
+---
+#- import_playbook: mongodb_init.yml
+
+  #gather_facts: false
+  #become: true
+  #become_method: sudo
+  #vars: 
+  #  admin_name: admin
+  #  admin_password: admin
+  #  db_name: mongodb
+  #  db_user: mongoUser
+  #  db_password: devops
+  #  home_dir: /home/ubuntu
+
+  #environment:
+  #  APP_PORT: 3001
+  #  MONGO_PORT: 27017
+  #  MONGO_IP: "{{ ansible_host }}"
+  #  MONGO_USER: admin
+  #  MONGO_PASSWORD: password
+  #  MAIL_USER: devops2019.team12@gmail.com
+  #  MAIL_PASSWORD: devops#team12
+  #  MAIL_SMPT: 'smtp.gmail.com'
+
+  - name: Update and upgrade apt packages mongodb
+    apt:
+      update_cache: yes
+      upgrade: yes
+      cache_valid_time: 86400
+    become: true
+
+
+  #- name: Install dependencies | npm
+  #  npm:
+  #    path: "{{ home_dir }}/checkbox/server-side/site"
+
+  - name: Import MongoDB public GPG Key from ubuntu keyserver
+    become: true
+    apt_key:
+      keyserver: keyserver.ubuntu.com
+      id: 2930ADAE8CAF5059EE73BB4B58712A2291FA4AD5
+      state: present
+ 
+  - name: Add repository for MongoDB
+    shell: sudo apt-add-repository "deb [ arch=$(dpkg --print-architecture) ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -sc)/mongodb-org/3.6 multiverse"
+    become: true
+     
+  - name: Install latest package
+    become: true
+    apt:
+      name: ['mongodb','python-pip','python3-pip','python3-setuptools']
+      state: latest
+      update_cache: yes
+      force: yes
+     
+  - name: Install pymongo
+    become: true
+    pip:
+      name: pymongo
+      state: latest
+
+  - name: Start service mongodb, if not started
+    service:
+      name: mongodb
+      state: started
+
+  - name: Create MongoDB root user 'admin'
+    mongodb_user:
+      database: "admin"
+      name: "{{ lookup('env', 'MONGO_USER') }}"
+      password: "{{ lookup('env', 'MONGO_PASSWORD') }}"
+      roles: "root"
+      state: present 
+     
+  - name: Create a new database 'mongodb' and user in MongoDB
+    become: true
+    mongodb_user: 
+      login_user: "{{ lookup('env', 'MONGO_USER') }}"
+      login_password: "{{ lookup('env', 'MONGO_PASSWORD') }}"
+      database: 'mongodb'
+      name: "{{ lookup('env', 'MONGO_USER') }}"
+      password: "{{ lookup('env', 'MONGO_PASSWORD') }}"
+     # name: '{{db_user}}'
+     # password: '{{db_password}}'
+      roles: readWrite,dbAdmin,userAdmin
+      state: present
+
+
+###
+
+
+#  - name: Starting/Restarting nginx using forever
+#    shell: forever stopall; forever start server.js
+#    args:
+#      chdir: "/home/ubuntu/checkbox/server-side/site/"
+

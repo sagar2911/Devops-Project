@@ -1,0 +1,146 @@
+---
+- name: Check if jetty9 folder exists
+  stat: 
+    path: /opt/jetty9
+  register: jetty9_exist
+
+- name: Stop jetty
+  become: true
+  shell: './jetty.sh stop'
+  args:
+    chdir: /opt/jetty9/bin
+  when: jetty9_exist.stat.exists
+
+- name: Delete folder if exists
+  become: true
+  file:
+    path: /opt/jetty9
+    state: absent 
+  when: jetty9_exist.stat.exists
+
+- name: Update apt
+  apt:
+    update_cache: yes
+
+- name: Get jetty tar
+  shell: 'wget -c http://repo1.maven.org/maven2/org/eclipse/jetty/jetty-distribution/9.3.12.v20160915/jetty-distribution-9.3.12.v20160915.tar.gz'
+
+- name: Extract jetty tar
+  shell: 'tar xzf jetty-distribution-9.3.12.v20160915.tar.gz'
+
+- name: Check if jetty9 folder exists
+  stat: 
+    path: jetty9
+  register: jetty9_exist
+
+- name: Delete folder if exists
+  become: true
+  file:
+    path: jetty9
+    state: absent 
+  when: jetty9_exist.stat.exists
+
+- name: Rename jetty
+  shell: 'mv jetty-distribution-9.3.12.v20160915 jetty9'
+
+# - name: Check if jetty9 folder exists
+#   stat: 
+#     path: /opt/jetty9
+#   register: jetty9_exist
+
+# - name: Delete folder if exists
+#   become: true
+#   file:
+#     path: /opt/jetty9
+#     state: absent 
+#   when: jetty9_exist.stat.exists
+
+- name: move jetty
+  become: true
+  shell: 'mv jetty9 /opt'
+
+# - name: Group jetty
+#   become: true
+#   shell: 'addgroup --quiet --system jetty'
+
+# - name: User jetty
+#   become: true
+#   shell: 'adduser --quiet --system --ingroup jetty --no-create-home --disabled-password jetty'
+
+# - name: Entry to change home and group for jetty user
+#   become: true
+#   shell: 'usermod -c "Jetty 9" -d /opt/jetty9 -g jetty jetty'
+
+# - name: Change owner
+#   become: true
+#   shell: 'chown -R jetty:jetty /opt/jetty9'
+
+# - name: Change permissions
+#   become: true
+#   shell: 'chmod u=rwx,g=rxs,o= jetty9'
+
+- name: Check if logs folder exists
+  stat: 
+    path: /var/logs/jetty9
+  register: logs_exist
+
+- name: Delete folder if exists
+  become: true
+  file:
+    path: /var/logs/jetty9
+    state: absent 
+  when: logs_exist.stat.exists
+
+- name: create directory
+  become: true 
+  file:
+    path: /var/logs/jetty9
+    state: directory
+
+# - name: Change permissions
+#   become: true
+#   shell: 'chown -R jetty:jetty /var/logs/jetty9'
+
+- name: Check if default folder exists
+  stat: 
+    path: /opt/jetty9/etc/default
+  register: default_exist
+
+- name: Delete folder if exists
+  become: true
+  file:
+    path: /opt/jetty9/etc/default
+    state: absent 
+  when: default_exist.stat.exists
+
+- name: create directory
+  become: true 
+  file:
+    path: /opt/jetty9/etc/default
+    state: directory
+
+# - name: Copy files
+#   copy:
+#     src: "/ansible-srv/roles/jetty/templates/jetty9.conf.j2"
+#     dest: "/opt/jetty9/etc/default/jetty9.conf"
+
+# - name: Symbolic link to init.d
+#   become: true
+#   shell: 'ln -sf /jetty9/bin/jetty.sh /etc/init.d/jetty9'
+
+# - name: Symbolic link to init.d
+#   become: true
+#   shell: 'cp jetty9/bin/jetty.sh /etc/init.d/jetty'
+
+# - name: Start on boot
+#   become: true
+#   shell: 'update-rc.d jetty9 defaults'
+
+# - name: Start jetty
+#   become: true
+#   shell: 'java -jar start.jar'
+#   args:
+#     chdir: /opt/jetty9
+
+
+

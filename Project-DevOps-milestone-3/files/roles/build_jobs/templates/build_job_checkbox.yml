@@ -1,0 +1,27 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    checkbox_job: checkboxio
+    user_name: jenkins
+    user_password: password
+
+  tasks:
+  - name: check if checkbox git folder exists
+    stat:
+      path: "/var/lib/jenkins/workspace/{{checkbox_job}}/checkbox.io/"
+    register: checkbox_git_file
+
+  - name: delete if the checkbox git directory exists
+    file:
+      state: absent
+      path: "/var/lib/jenkins/workspace/{{checkbox_job}}/checkbox.io/"
+    when: checkbox_git_file.stat.exists
+    become: true
+
+  - name: build checkboxio job
+    shell: "{{ item }}"
+    become: true
+    with_items:
+      - 'java -jar jenkins-cli.jar -s http://localhost:9000/ -auth {{ user_name }}:{{ user_password }} build {{ checkbox_job }}'
+    become: true

@@ -1,0 +1,82 @@
+---
+- name: Deploy iTrust-Server on AWS
+  hosts: localhost
+  connection: localhost
+  roles:
+    - role: ec2-provision
+      NODE_NAME: iTrust-prod
+      NODE_GROUP: iTrust
+      SERVER_TYPE: 'iTrust'
+    #- role: ec2-provision
+    #  NODE_NAME: checkbox2
+    #  NODE_GROUP: checkbox2
+
+- name: Setup environment variables on iTrust server
+  hosts: localhost:iTrust-prod
+  gather_facts: False
+  become: true
+  vars_files:
+    - variables.yml
+  pre_tasks:
+    - name: Install Python2
+      raw: apt-get -y install python-simplejson
+
+  roles:
+    - mysql
+    - redis
+    - java
+    # - jetty
+
+
+  tasks:
+    - lineinfile: dest=/etc/environment line=MAIL_USER={{ lookup('env', 'MAIL_USER') }}
+    - lineinfile: dest=/etc/environment line=MAIL_PASSWORD={{ lookup('env', 'MAIL_PASSWORD') }}
+    - lineinfile: dest=/etc/environment line=MAIL_SMTP={{ lookup('env', 'MAIL_SMTP') }}
+    - lineinfile: dest=/etc/environment line=GIT_TOKEN={{ lookup('env', 'GIT_TOKEN') }}
+    - lineinfile: dest=/etc/environment line=AWS_REGION={{ lookup('env', 'AWS_REGION') }}
+    - lineinfile: dest=/etc/environment line=AWS_ACCESS_KEY={{ lookup('env', 'AWS_ACCESS_KEY') }}
+    - lineinfile: dest=/etc/environment line=AWS_SECRET_ACCESS_KEY={{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}
+    - lineinfile: dest=/etc/environment line=MYSQL_PASSWORD={{ lookup('env', 'MYSQL_PASSWORD') }}
+
+    - name : Install maven
+      apt: name=maven state=latest update_cache=yes 
+
+- name: Setup jetty on iTrust production server
+  hosts: iTrust-prod
+  gather_facts: False
+  become: true
+  roles:
+    - jetty
+
+- name: Build iTrust in ec2 instance
+  hosts: localhost
+  gather_facts: false
+   
+  tasks:
+    - name: Clone iTrust repo
+      git:
+        repo : "/home/ubuntu/deploy/iTrust-prod.git"
+        # repo : "https://{{ lookup('env','GIT_TOKEN') }}@github.ncsu.edu/sbajaj/iTrust2-v4.git"
+        dest : /home/ubuntu/iTrust2-v4
+        clone : yes
+
+    - name: copy db.properties
+      copy:
+        src : /home/ubuntu/iTrust2-v4/iTrust2/src/main/java/db.properties.template
+        dest : /home/ubuntu/iTrust2-v4/iTrust2/src/main/java/db.properties
+    
+    - name: copy email.properties.template
+      copy:
+        src: /home/ubuntu/iTrust2-v4/iTrust2/src/main/java/email.properties.template
+        dest: /home/ubuntu/iTrust2-v4/iTrust2/src/main/java/email.properties
+
+    - name: Build iTrust
+      shell: cd /home/ubuntu/iTrust2-v4/iTrust2/ && mvn -f pom-data.xml process-test-classes
+
+    - name: Run
+      shell: cd /home/ubuntu/iTrust2-v4/iTrust2/ && mvn clean test #verify checkstyle:checkstyle
+
+    - name: Package
+      shell: mvn clean dependency:copy-dependencies package
+      args:
+        chdir: /home/ubuntu/iTrust2-v4/iTrust2

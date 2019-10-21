@@ -1,0 +1,94 @@
+---
+
+- name: Check if the cluster has already been initialized
+  become: true
+  stat:
+    path: /etc/kubernetes/manifests/kube-apiserver.yaml
+  register: file_details
+
+#- name: Generate bootstrap token
+#  shell: kubeadm token create --ttl 0
+#  register: kubetoken
+#
+#- debug:
+#    msg: "{{ kubetoken }}"
+#- name: Add kubernetes token to environment
+#  become: yes
+#  lineinfile:
+#    path: /etc/environment
+#    regexp: "kubetoken="
+#    line: "kubetoken={{ kubetoken.stdout }}"
+#
+#- name: Export EC2 instance IP
+#  lineinfile:
+#      path: ~/.bashrc
+#      regexp: "export kubetoken="
+#      line: "export kubetoken={{ kubetoken.stdout }}"
+#  delegate_to: localhost
+#
+#- name: Source the bashrc
+#  #shell: "export kubetoken={{ kubetoken.stdout }}"
+#  shell: source ~/.bashrc
+#  become: true
+#  become_method: sudo
+#  args:
+#    executable: /bin/bash
+#  delegate_to: localhost
+
+#- name: Initialize Kubernetes cluster
+#  become: yes
+#  shell: "kubeadm init --token={{ kubetoken.stdout }} --ignore-preflight-errors=..."
+#  when: file_details.stat.exists == false
+
+- name: Initialize Kubernetes cluster
+  become: yes
+  shell: "kubeadm init --ignore-preflight-errors=all"
+  when: file_details.stat.exists == false
+
+- name: Create .kube directory
+  become: yes
+  file:
+    path: "{{ ansible_env.HOME }}/.kube"
+    state: directory
+  when: file_details.stat.exists == false
+
+- name: Copy config file
+  become: yes
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "{{ ansible_env.HOME }}/.kube/config"
+    remote_src: yes
+    mode: 0777
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+  when: file_details.stat.exists == false
+
+- name: Generate join command
+  command: kubeadm token create --print-join-command
+  register: join_command
+
+- name: Copy join command to local file
+  local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
+
+- name: Add iptable config
+  shell: sysctl net.bridge.bridge-nf-call-iptables=1
+  when: file_details.stat.exists == false
+
+- name: Kubever
+  shell: export kubever=$(kubectl version | base64 | tr -d '\n') && kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$kubever"
+  when: file_details.stat.exists == false
+
+- name: Apply version
+  shell: kubectl taint nodes --all node-role.kubernetes.io/master-
+  when: file_details.stat.exists == false
+
+- name: Pause 30 seconds
+  pause:
+    seconds: 30
+  when: file_details.stat.exists == false
+
+- name: Applying Kubernetes Network Provider settings
+  shell: sudo kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=1.10"
+  args:
+    warn: false
+  when: file_details.stat.exists == false

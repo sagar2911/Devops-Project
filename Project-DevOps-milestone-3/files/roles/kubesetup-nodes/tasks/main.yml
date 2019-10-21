@@ -1,0 +1,18 @@
+---
+
+#- debug: msg="{{ token }}"
+#- debug: msg="mASTER IP IS {{ master_ip }}"
+#- name: Join Kubernetes cluster
+#  become: yes
+#  shell: "kubeadm join --token={{ token }} --discovery-token-unsafe-skip-ca-verification {{ master_ip }}:6443"
+#  args:
+#    warn: false
+#
+- name: Copy the join command to server location
+  become: true
+  copy: src=join-command dest=/tmp/join-command.sh mode=0777
+
+- name: Join the node to cluster
+  become: true
+  command: sh /tmp/join-command.sh
+...

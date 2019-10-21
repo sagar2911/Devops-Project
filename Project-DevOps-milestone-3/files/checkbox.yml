@@ -1,0 +1,245 @@
+---
+#KUBERNETES
+- include: kubernetes-deployer.yml
+
+- name: Deploy Checkbox-Server on AWS
+  hosts: localhost
+  become: true
+  connection: localhost
+  pre_tasks:
+    - name: Check if checkbox instance already exists
+      ec2_instance_facts:
+        filters:
+          "tag:Name": checkbox1
+      register: aws
+    - set_fact: aws="{{ aws }}"
+
+    - name: Check if checkbox instance already exists
+      ec2_instance_facts:
+        filters:
+          "tag:Name": canary_checkbox
+      register: aws
+    - set_fact: aws="{{ aws }}"
+
+  roles:
+    - role: ec2-provision
+      NODE_NAME: checkbox1
+      NODE_GROUP: checkbox1
+      SERVER_TYPE: 'checkbox'
+    - role: ec2-provision
+      NODE_NAME: canary_checkbox
+      NODE_GROUP: canary_checkbox
+      SERVER_TYPE: 'checkbox'
+
+### Dependencies for the application (such as mongodb, nginx,...) are only installed when a new instance is spawned
+
+- name: Setup dependencies on Checkbox server
+  hosts: checkbox1:canary_checkbox
+  gather_facts: False
+  become: yes
+  tasks:
+    - include_role:
+        name: checkbox_dependencies        
+       #when: aws.instances | length == 0
+
+#- name: Setup Checkbox Stable server
+#  hosts: checkbox1
+#  tasks:
+#    - name: Clone git repo
+#      become: false
+#      git:
+#        repo: "ubuntu@{{ lookup('env','JENKINS_IP') }}:~/deploy/checkbox-prod.git"
+#        dest: "/home/ubuntu/checkbox.io"
+#        clone: yes
+
+- name: Setup Checkbox servers
+  #hosts: checkbox1
+  hosts: localhost
+  become: yes
+  tasks:
+    #- name: Changing Permission for Nginx
+    #  shell: "chmod 777 /home/ubuntu/checkbox.io && chmod 777 /home/ubuntu/checkbox.io/public_html"
+
+    - name: Install node modules for checkbox.io
+      shell: "npm install"
+      args:
+        chdir: "/home/ubuntu/checkbox.io/server-side/site/"
+
+    #- name: Install forever
+    #  shell: "npm install forever -g"
+    #  args:
+    #    chdir: "/home/ubuntu/checkbox.io/server-side/site/"
+
+    #- name: Run Checkbox.io
+    #  shell: "forever start server.js"
+    #  args:
+    #    chdir: "/home/ubuntu/checkbox.io/server-side/site/"
+    - name: Replace the server root in the "default" file
+      replace:
+        dest: "/home/ubuntu/checkbox.io/local-conf/default"
+        regexp: "root (.)+;"
+        replace: "root /home/ubuntu/checkbox.io/public_html/;"
+
+    - name: 'Copy files from checkbox to nginx available sites'
+      copy:
+        src: "/home/ubuntu/checkbox.io/local-conf/default"
+        dest: /etc/nginx/sites-available/default
+        remote_src: yes
+        mode: 0644
+      become: yes
+      become_method: sudo
+
+    - name: 'Copy nginx conf file'
+      copy:
+        src: "/home/ubuntu/checkbox.io/local-conf/nginx.conf"
+        dest: /etc/nginx/nginx.conf
+        remote_src: yes
+        mode: 0644
+      become: yes
+      become_method: sudo
+
+    - name: Restart Nginx
+      become: true
+      service:
+        name: nginx
+        state: restarted
+
+###
+
+    - name: Install process manager using npm
+      become: true
+      npm:
+        global: yes
+        name: pm2
+
+    - name: Running checkbox using pm2
+      shell: pm2 stop all; pm2 start server.js
+      become: false
+      args:
+        chdir: "/home/ubuntu/checkbox.io/server-side/site/"
+
+
+#- name: Run infrastructure.js on jenkins
+#  hosts: localhost
+#  tasks:
+#    - name: NPM Install
+#      shell: "npm install"
+#      args:
+#        chdir: "/files/canary/"
+#
+#    - name: Install forever
+#      shell: "npm install forever -g"
+#      args:
+#        chdir: "/files/canary"
+#        
+#    - name: start infrastructure
+#      shell: forever start /files/canary/infrastructure.js
+
+- name: clone checkbox.io 
+  hosts: checkbox1
+  become: true
+  tasks:
+    - name: Delete checkbox directory if already exist
+      become: true
+      shell: rm -rf /home/ubuntu/checkbox.io
+
+    - name: checkbox stable
+      git:
+        repo: "https://github.com/cvellai/checkbox.io.git"
+        dest: /home/ubuntu/checkbox.io
+        clone: yes
+
+- name: clone checkbox.io canary release
+  hosts: canary_checkbox
+  become: true
+  tasks:
+    - name: Delete checkbox directory if already exist
+      become: true
+      shell: rm -rf /home/ubuntu/checkbox.io
+
+    - name: checkbox canary
+      git:
+        repo: "https://github.com/alagava/checkbox.io.git"
+        #repo: "https://github.com/cvellai/checkbox.io.git"
+        dest: /home/ubuntu/checkbox.io
+        clone: yes
+
+- name: Deploy final 
+  hosts: checkbox1:canary_checkbox
+  become: true
+  tasks:
+    #- name: git clone checkbox.io
+    #  become: false
+    #  git:
+    #    repo: "https://github.com/cvellai/checkbox.io.git"
+    #    dest: /home/ubuntu/checkbox.io
+    #    clone: yes
+    #- name: copy folder
+    #  copy:
+    #    src: /home/ubuntu/checkbox.io
+    #    dest: /home/ubuntu
+    #    directory_mode: yes
+    - name: Changing Permission for checkbox
+      shell: "chmod 777 -R /home/ubuntu/checkbox.io"
+
+    - name: Install node modules for checkbox.io
+      shell: "npm install"
+      args:
+        chdir: "/home/ubuntu/checkbox.io/server-side/site/"
+    - name: Replace the server root in the "default" file
+      replace:
+        dest: "/home/ubuntu/checkbox.io/local-conf/default"
+        regexp: "root (.)+;"
+        replace: "root /home/ubuntu/checkbox.io/public_html/;"
+
+    - name: 'Copy files from checkbox to nginx available sites'
+      copy:
+        src: "/home/ubuntu/checkbox.io/local-conf/default"
+        dest: /etc/nginx/sites-available/default
+        remote_src: yes
+        mode: 0644
+      become: yes
+      become_method: sudo
+
+    - name: 'Copy nginx conf file'
+      copy:
+        src: "/home/ubuntu/checkbox.io/local-conf/nginx.conf"
+        dest: /etc/nginx/nginx.conf
+        remote_src: yes
+        mode: 0644
+      become: yes
+      become_method: sudo
+
+    - name: Restart Nginx
+      become: true
+      service:
+        name: nginx
+        state: restarted
+
+    - name: Install process manager using npm
+      become: true
+      npm:
+        global: yes
+        name: pm2
+
+    - name: Running checkbox using pm2
+      shell: pm2 stop all; pm2 start server.js
+      become: false
+      args:
+        chdir: "/home/ubuntu/checkbox.io/server-side/site/"
+
+- name: Run infrastructure.js on jenkins server
+  hosts: localhost
+  tasks:
+    - name: NPM Install
+      shell: "npm install"
+      args:
+        chdir: "/home/ubuntu/files/checkbox_canary/"
+
+    - name: Install forever
+      shell: "npm install forever -g"
+      args:
+        chdir: "/home/ubuntu/files/checkbox_canary"
+        
+    - name: start infrastructure
+      shell: forever start /home/ubuntu/files/checkbox_canary/infrastructure.js

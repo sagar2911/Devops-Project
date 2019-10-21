@@ -1,0 +1,119 @@
+---
+    - name: set GIT_EMAIL
+      become: yes
+      lineinfile:
+         path: /etc/environment
+         regexp: "GIT_EMAIL="
+         line: "GIT_EMAIL={{ lookup('env','GIT_EMAIL') }}"
+
+    - name: set GIT_NAME
+      become: yes
+      lineinfile:
+         path: /etc/environment
+         regexp: "GIT_NAME="
+         line: "GIT_NAME={{ lookup('env','GIT_NAME') }}"
+
+    - name: set GIT_TOKEN
+      become: yes
+      lineinfile:
+         path: /etc/environment
+         regexp: "GIT_TOKEN="
+         line: "GIT_TOKEN={{ lookup('env','GIT_TOKEN') }}"
+
+    - name: set MAIL_USER
+      become: yes
+      lineinfile:
+         path: /etc/environment
+         regexp: "MAIL_USER="
+         line: "MAIL_USER={{ lookup('env','MAIL_USER') }}"
+
+    - name: set MAIL_PASSWORD
+      become: yes
+      lineinfile:
+         path: /etc/environment
+         regexp: "MAIL_PASSWORD="
+         line: "MAIL_PASSWORD={{ lookup('env','MAIL_PASSWORD') }}"
+
+    - name: set MAIL_SMTP
+      become: yes
+      lineinfile:
+         path: /etc/environment
+         regexp: "MAIL_SMTP="
+         line: "MAIL_SMTP={{ lookup('env','MAIL_SMTP') }}"
+
+    - name: set MONGO_PORT
+      become: yes
+      lineinfile:
+         path: /etc/environment
+         regexp: "MONGO_PORT="
+         line: "MONGO_PORT={{ lookup('env','MONGO_PORT') }}"
+
+    - name: set MONGO_IP
+      become: yes
+      lineinfile:
+         path: /etc/environment
+         regexp: "MONGO_IP="
+         line: "MONGO_IP={{ lookup('env','JENKINS_IP') }}"
+
+    - name: set MONGO_PASSWORD
+      become: yes
+      lineinfile:
+         path: /etc/environment
+         regexp: "MONGO_PASSWORD="
+         line: "MONGO_PASSWORD={{ lookup('env','MONGO_PASSWORD') }}"
+
+    - name: set MONGO_USER
+      become: yes
+      lineinfile:
+         path: /etc/environment
+         regexp: "MONGO_USER="
+         line: "MONGO_USER={{ lookup('env','MONGO_USER') }}"
+
+    - name: set MYSQL_PASSWORD
+      become: yes
+      lineinfile:
+         path: /etc/environment
+         regexp: "MYSQL_PASSWORD="
+         line: "MYSQL_PASSWORD={{ lookup('env','MYSQL_PASSWORD') }}"
+
+    - name: set JENKINS_PASSWORD
+      become: yes
+      lineinfile:
+         path: /etc/environment
+         regexp: "JENKINS_PASSWORD="
+         line: "JENKINS_PASSWORD={{ lookup('env','JENKINS_PASSWORD') }}"
+
+    - name: set JENKINS_USER
+      become: yes
+      lineinfile:
+          path: /etc/environment
+          regexp: "JENKINS_USER="
+          line: "JENKINS_USER={{ lookup('env','JENKINS_USER') }}"
+
+    - name: set AWS_REGION
+      become: yes
+      lineinfile:
+          path: /etc/environment
+          regexp: "AWS_REGION="
+          line: "AWS_REGION={{ lookup('env','AWS_REGION') }}"
+
+    - name: set AWS_ACCESS_KEY
+      become: yes
+      lineinfile:
+          path: /etc/environment
+          regexp: "AWS_ACCESS_KEY="
+          line: "AWS_ACCESS_KEY={{ lookup('env','AWS_ACCESS_KEY') }}"
+
+    - name: set  AWS_SECRET_ACCESS_KEY
+      become: yes
+      lineinfile:
+          path: /etc/environment
+          regexp: "AWS_SECRET_ACCESS_KEY="
+          line: "AWS_SECRET_ACCESS_KEY={{ lookup('env','AWS_SECRET_ACCESS_KEY') }}"
+
+    - name: set localhostIP
+      become: yes
+      lineinfile:
+          path: /etc/environment
+          regexp: "localhost="
+          line: "localhost={{ lookup('env','localhost') }}"

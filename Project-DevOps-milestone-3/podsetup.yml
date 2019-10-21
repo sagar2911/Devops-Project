@@ -1,0 +1,38 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkbox-md
+  labels:
+    app: checkbox-md
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 5050
+    nodePort: 32000
+  selector:
+    app: checkbox-md
+
+
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkbox-md
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: checkbox-md
+  template:
+    metadata:
+      labels:
+        app: checkbox-md
+    spec:
+      containers:
+      - name: microservice
+        image: cvellai/marqdown2html
+        ports:
+        - containerPort: 5050

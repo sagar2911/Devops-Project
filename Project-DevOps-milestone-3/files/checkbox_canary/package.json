@@ -1,0 +1,16 @@
+{
+  "name": "checkbox-infra",
+  "version": "1.0.0",
+  "description": "",
+  "main": "infrastructure.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Avanti Lagavankar",
+  "license": "ISC",
+  "dependencies": {
+    "http": "0.0.0",
+    "http-proxy": "^1.16.2",
+    "request": "^2.85.0"
+  }
+}

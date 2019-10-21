@@ -1,0 +1,124 @@
+---
+  - name: Delete checkbox directory if already exist
+    become: true
+    shell: rm -rf /home/ubuntu/checkbox.io
+
+  - name: git clone checkbox.io
+    become: true
+    git:
+      repo: "https://github.com/cvellai/checkbox.io.git"
+      dest: /home/ubuntu/checkbox.io
+      clone: yes
+
+  - name: Delete iTrust directory if already exist
+    become: true
+    shell: rm -rf /home/ubuntu/iTrust2-v4
+
+  - name: git clone iTrust2-v4
+    become: true
+    git:
+      repo: "https://{{ lookup('env', 'GIT_TOKEN') }}@github.ncsu.edu/sbajaj/iTrust2-v4.git"
+      #repo: "git@github.ncsu.edu:sbajaj/iTrust2-v4.git"
+      dest: /home/ubuntu/iTrust2-v4
+      clone: yes
+
+  - name: Set appropriate permissions
+    become: true
+    shell: chmod -R 777 /home/ubuntu/checkbox.io && chmod -R 777 /home/ubuntu/iTrust2-v4
+
+  - name: Setting Git username and email
+    become: true
+    shell: cd /home/ubuntu/iTrust2-v4 && git config --global user.name "{{ lookup('env','GIT_NAME') }}" && git config --global user.email "{{ lookup('env','GIT_EMAIL') }}" 
+  
+  # Setup env iTrust
+  #- name: Create directory for iTrust bare repo 
+  #  become: false
+  #  file: path=~/deploy/production.git state=directory
+
+  #- name: Initialze a bare git repository 
+  #  become: false
+  #  shell: git init --bare
+  #  args:
+  #    chdir: ~/deploy/production.git/
+
+  #- name: Copy post-receive hook to bare git repo
+  #  become: false
+  #  template:
+  #    src: "post-receive-iTrust"
+  #    dest: "~/deploy/production.git/hooks/post-receive"
+  #    mode: 0777
+
+  # - name: production environment
+  #   file: path=/deploy/production-www state=directory
+
+  #- name: Add bare repo as remote 
+  #  become: false
+  #  shell: git remote add prod ~/deploy/production.git
+  #  args:
+  #    chdir: /home/ubuntu/iTrust2-v4
+  #  ignore_errors: yes
+
+  #- name: Enable firewall
+  #  shell: sudo ufw enable
+
+  - name: Restart mysql server
+    shell: service mysql restart
+
+  # Setup env checkbox
+
+  - name: Create directory for checkbox.io bare repo
+    become: false
+    file: path=~/deploy/checkbox-prod.git state=directory
+
+  - name: Initialze bare git repository 
+    become: false
+    shell: git init --bare
+    args:
+      chdir: ~/deploy/checkbox-prod.git/
+
+  - name: Copy post-receive hook to bare git repo
+    become: false
+    template:
+      src: "post-receive-checkbox"
+      dest: "~/deploy/checkbox-prod.git/hooks/post-receive"
+      mode: 0777
+
+  # - name: production environment
+  #   file: path=/deploy/checkbox-prod-www state=directory
+
+  - name: Add bare repo as remote
+    become: false
+    shell: git remote add prod ~/deploy/checkbox-prod.git
+    args:
+      chdir: /home/ubuntu/checkbox.io
+    ignore_errors: yes
+  
+   # Setup env iTrust
+
+  - name: Create directory for checkbox.io bare repo
+    become: false
+    file: path=~/deploy/iTrust-prod.git state=directory
+
+  - name: Initialze bare git repository
+    become: false
+    shell: git init --bare
+    args:
+      chdir: ~/deploy/iTrust-prod.git/
+
+  - name: Copy post-receive hook to bare git repo
+    become: false
+    template:
+      src: "post-receive-iTrust"
+      dest: "~/deploy/iTrust-prod.git/hooks/post-receive"
+      mode: 0777
+
+  # - name: production environment
+  #   file: path=/deploy/checkbox-prod-www state=directory
+
+  - name: Add bare repo as remote
+    become: false
+    shell: git remote add prod ~/deploy/iTrust-prod.git
+    args:
+      chdir: /home/ubuntu/iTrust2-v4
+    ignore_errors: yes
+

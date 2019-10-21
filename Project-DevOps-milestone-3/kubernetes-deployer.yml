@@ -1,0 +1,91 @@
+---
+- name: Provision Kubernetes nodes on Amazon EC2
+  hosts: localhost
+  connection: localhost
+  tasks:
+    - name: Create Kubernetes master
+      include_role:
+        name: ec2-provision
+      vars:
+        NODE_GROUP: kubernetes-master
+        NODE_NAME: kubemaster
+        SERVER_TYPE: kubernetes
+   
+    - name: Create nodes for kubernetes cluster
+      include_role:
+        name: ec2-provision
+      vars:
+        NODE_GROUP: "kubernetes-nodes"
+        NODE_NAME: "{{ item }}"
+        SERVER_TYPE: kubernetes
+      with_items:
+        - "kubenode1"
+        - "kubenode2"
+        - "kubenode3"
+
+- name: Install docker and common-dependencies in kubemaster
+  hosts: kubernetes-master
+  gather_facts: no
+  pre_tasks:
+    - name: Install Python2
+      raw: apt-get -y install python-simplejson
+      become: yes
+
+    - name: Install pip
+      become: yes
+      apt:
+        name: python-pip
+        force: yes
+        update_cache: yes
+
+  roles:
+    - kubesetup-common
+    - docker
+    
+  tasks:
+    - name: Podsetup.yml
+      template:
+        src: "./podsetup.yml"
+        dest: "~/podsetup.yml"
+      # vars:
+        # mongo_ip: "{{ lookup('env','kubemaster') }}"
+        # redis_ip: "{{ lookup('env','kubemaster') }}"
+
+- hosts: kubernetes-nodes
+  gather_facts: no
+  pre_tasks:
+    - name: Install Python2
+      raw: apt-get -y install python-simplejson
+      become: yes
+
+    - name: Install pip
+      become: yes
+      apt:
+        name: python-pip
+        force: yes
+        update_cache: yes
+
+  roles:
+    - docker
+    - kubesetup-common
+
+- hosts: kubernetes-master
+  roles:
+    # - { role: mongodb, mongo_ip: "{{ lookup('env','kubemaster') }}" }
+    - role: kubesetup-master
+
+- hosts: kubernetes-nodes
+  roles:
+    - role: kubesetup-nodes
+#      vars: 
+#        master_ip: "{{ lookup('env','kubemaster') }}"
+#        token: "{{ lookup('env','kubetoken') }}"
+
+- hosts: kubernetes-master
+  tasks:
+    - name: Start deployment
+      shell: kubectl create -f ~/podsetup.yml
+
+#    - name: Expose application
+#      shell: kubectl expose deployment checkbox-deployment --type="LoadBalancer" --port 5050
+...

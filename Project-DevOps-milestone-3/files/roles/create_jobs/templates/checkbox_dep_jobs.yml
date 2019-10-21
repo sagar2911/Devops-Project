@@ -1,0 +1,7 @@
+- job:
+    name: "{{checkbox_job}}"
+    description: "automatically build checkbox"
+    project-type: freestyle
+    #workspace: /var/lib/jenkins/jobs/{{checkbox_job}}/workspace
+    builders:
+      - shell: 'sudo ansible-playbook /home/ubuntu/files/checkbox.yml'

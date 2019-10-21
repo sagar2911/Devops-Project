@@ -1,0 +1,14 @@
+{
+  "name": "fuzzer",
+  "version": "1.0.0",
+  "description": "iTrust fuzzer",
+  "main": "fuzzer.js",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "fuzzer": "^0.2.0",
+    "random-js": "^1.0.4",
+    "path": "^0.12.7",
+    "child_process": "^1.0.2"
+  }
+}
